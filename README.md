@@ -1,6 +1,6 @@
 # kube
 
-My repo for testing Kubernetes on a single GCP instance. The start up script provisions a Kubernetes 1.8 cluster with cri-containerd and Istio.
+My repo for testing Kubernetes on a single GCP instance. The start up script provisions a Kubernetes 1.10 cluster with cri-containerd and Istio.
 
 ## Usage
 
