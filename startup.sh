@@ -16,29 +16,31 @@ mkdir -p \
 
 wget -q --show-progress --https-only --timestamping \
   https://github.com/containernetworking/plugins/releases/download/v0.6.0/cni-plugins-amd64-v0.6.0.tgz \
-  https://github.com/kubernetes-incubator/cri-containerd/releases/download/v1.0.0-alpha.0/cri-containerd-1.0.0-alpha.0.tar.gz \
+  https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.1.0-rc.2.linux-amd64.tar.gz \
   https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 \
   https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 \
-  https://github.com/coreos/etcd/releases/download/v3.2.8/etcd-v3.2.8-linux-amd64.tar.gz \
-  https://github.com/istio/istio/releases/download/0.2.6/istio-0.2.6-linux.tar.gz \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kube-apiserver \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kube-controller-manager \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kube-scheduler \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kubectl \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kube-proxy \
-  https://storage.googleapis.com/kubernetes-release/release/v1.8.0/bin/linux/amd64/kubelet
+  https://github.com/coreos/etcd/releases/download/v3.3.9/etcd-v3.3.9-linux-amd64.tar.gz \
+  https://github.com/istio/istio/releases/download/1.0.3/istio-1.0.3-linux.tar.gz \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kube-apiserver \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kube-controller-manager \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kube-scheduler \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kubectl \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kube-proxy \
+  https://storage.googleapis.com/kubernetes-release/release/v1.10.10/bin/linux/amd64/kubelet 
 
-tar -xvf istio-0.2.6-linux.tar.gz
-mv istio-0.2.6/bin/istioctl /usr/local/bin/
+tar -xvf istio-1.0.3-linux.tar.gz
+mv istio-1.0.3/bin/istioctl /usr/local/bin/
 
 tar -xvf cni-plugins-amd64-v0.6.0.tgz -C /opt/cni/bin/
-tar -xvf cri-containerd-1.0.0-alpha.0.tar.gz -C /
+
+tar -xvf cri-containerd-1.1.0-rc.2.linux-amd64.tar.gz -C /
+tar -xzf containerd-1.1.5.linux-amd64.tar.gz -C /
 
 chmod +x kube-apiserver kube-controller-manager kube-proxy kube-scheduler kubectl kubelet
 mv kube-apiserver kube-controller-manager kube-proxy kube-scheduler kubectl kubelet /usr/local/bin/
 
-tar -xvf etcd-v3.2.8-linux-amd64.tar.gz
-sudo mv etcd-v3.2.8-linux-amd64/etcd* /usr/local/bin/
+tar -xvf etcd-v3.3.9-linux-amd64.tar.gz
+sudo mv etcd-v3.3.9-linux-amd64/etcd* /usr/local/bin/
 
 chmod +x cfssl_linux-amd64 cfssljson_linux-amd64
 mv cfssl_linux-amd64 /usr/local/bin/cfssl
@@ -309,7 +311,7 @@ rules:
       - group: "" # core
         resources: ["endpoints", "services"]
   - level: None
-    # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
+    # Ingress controller reads 'configmaps/ingress-uid' through the unsecured port.
     # TODO(#46983): Change this to the ingress controller service account.
     users: ["system:unsecured"]
     namespaces: ["kube-system"]
@@ -414,7 +416,6 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --service-account-key-file=/var/lib/kubernetes/ca-key.pem \\
   --service-cluster-ip-range=10.32.0.0/24 \\
   --service-node-port-range=30000-32767 \\
-  --tls-ca-file=/var/lib/kubernetes/ca.pem \\
   --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \\
   --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \\
   --v=2
@@ -546,28 +547,18 @@ cat > kubelet.service <<EOF
 [Unit]
 Description=Kubernetes Kubelet
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-After=cri-containerd.service
-Requires=cri-containerd.service
+After=containerd.service
+Requires=containerd.service
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \\
-  --allow-privileged=true \\
-  --anonymous-auth=false \\
-  --authorization-mode=Webhook \\
-  --client-ca-file=/var/lib/kubernetes/ca.pem \\
   --cloud-provider="" \\
-  --cluster-dns=10.32.0.10 \\
-  --cluster-domain=cluster.local \\
   --container-runtime=remote \\
-  --container-runtime-endpoint=unix:///var/run/cri-containerd.sock \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
   --image-pull-progress-deadline=2m \\
   --kubeconfig=/var/lib/kubelet/kubeconfig \\
   --network-plugin=cni \\
-  --pod-cidr=${POD_CIDR} \\
   --register-node=true \\
-  --runtime-request-timeout=15m \\
-  --tls-cert-file=/var/lib/kubelet/${HOSTNAME}.pem \\
-  --tls-private-key-file=/var/lib/kubelet/${HOSTNAME}-key.pem \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -598,9 +589,8 @@ EOF
 mv kubelet.service kube-proxy.service /etc/systemd/system/
 
 systemctl daemon-reload
-
-systemctl enable containerd cri-containerd kubelet kube-proxy
-systemctl start containerd cri-containerd kubelet kube-proxy
+systemctl enable containerd kubelet kube-proxy
+systemctl start containerd kubelet kube-proxy
 
 
 # Create admin kubeconfig
@@ -629,14 +619,11 @@ chmod 644 kube.kubeconfig
 # Install Istio
 kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=admin
 
-kubectl apply -f istio-0.2.6/install/kubernetes/istio.yaml \
+kubectl apply -f install/kubernetes/helm/istio/templates/crds.yaml \
   --kubeconfig=kube.kubeconfig
 
-kubectl apply -f istio-0.2.6/install/kubernetes/addons/prometheus.yaml \
+kubectl apply -f istio-1.0.3/install/kubernetes/istio-demo-auth.yaml \
   --kubeconfig=kube.kubeconfig
 
-kubectl apply -f istio-0.2.6/install/kubernetes/addons/zipkin.yaml \
-  --kubeconfig=kube.kubeconfig
-
-kubectl apply -f istio-0.2.6/install/kubernetes/addons/grafana.yaml \
+kubectl label namespace default istio-injection=enabled \
   --kubeconfig=kube.kubeconfig
